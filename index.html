@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>喵喵怪貼圖關鍵字搜尋</title>
+<style>
+  :root {
+    --bg: #14141c;
+    --panel: #1e1e2a;
+    --border: #33333f;
+    --text: #e8e8ee;
+    --sub: #9a9aab;
+    --accent: #7c9eff;
+    --card-img-bg: #0d0d13;
+  }
+  [data-theme="light"] {
+    --bg: #f4f4f8;
+    --panel: #ffffff;
+    --border: #dcdce4;
+    --text: #1c1c26;
+    --sub: #6b6b7a;
+    --accent: #4a6fd6;
+    --card-img-bg: #f0f0f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+    padding: 24px 16px 60px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .top-bar {
+    display: flex;
+    justify-content: flex-end;
+    max-width: 900px;
+    margin: 0 auto 8px;
+  }
+  .theme-toggle {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin: 0 0 20px;
+  }
+  .search-box {
+    max-width: 500px;
+    margin: 0 auto 24px;
+    display: flex;
+    gap: 8px;
+  }
+  .search-box input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 15px;
+  }
+  .search-box input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .search-box button {
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #ffffff;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .hint {
+    text-align: center;
+    color: var(--sub);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .card img {
+    width: 100%;
+    max-height: 100px;
+    object-fit: contain;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background: var(--card-img-bg);
+  }
+  .card .lv {
+    display: inline-block;
+    background: var(--accent);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  .card .position {
+    color: var(--sub);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .card .keyword {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .status {
+    text-align: center;
+    color: var(--sub);
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">🌙 深色</button>
+</div>
+
+<h1>喵喵怪貼圖關鍵字搜尋</h1>
+<div class="search-box">
+  <input id="keywordInput" type="text" placeholder="輸入關鍵字，多個關鍵字用空白分隔">
+  <button onclick="doSearch()">搜尋</button>
+</div>
+<div class="hint">例如：床上 起來（會找出同時符合任一關鍵字的貼圖）</div>
+
+<div id="results" class="grid"></div>
+<div id="status" class="status">請輸入關鍵字開始搜尋</div>
+
+
+<script>
+  // 請換成你自己的 Apps Script /exec 網址
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxC3m87puyhhm6pkJ8pujRDRap-9Fxltitxuv0iw9QsaRmTtoOCYjHDWcZ4JSU5Jlmf/exec";
+
+  const input = document.getElementById('keywordInput');
+  const resultsEl = document.getElementById('results');
+  const statusEl = document.getElementById('status');
+  const toggleBtn = document.getElementById('themeToggle');
+
+  // ---- 主題切換 ----
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+      toggleBtn.textContent = '☀️ 淺色';
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      toggleBtn.textContent = '🌙 深色';
+    }
+  }
+
+  function toggleTheme() {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const next = isLight ? 'dark' : 'light';
+    localStorage.setItem('pjsekai_theme', next);
+    applyTheme(next);
+  }
+
+  // 讀取上次選的主題，沒有的話跟隨系統偏好
+  const saved = localStorage.getItem('pjsekai_theme');
+  if (saved) {
+    applyTheme(saved);
+  } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+    applyTheme('light');
+  }
+
+  // ---- 搜尋 ----
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doSearch();
+  });
+
+  async function doSearch() {
+    const keyword = input.value.trim();
+    resultsEl.innerHTML = '';
+    statusEl.style.display = 'block';
+    statusEl.textContent = '搜尋中...';
+
+    try {
+      const url = SCRIPT_URL + '?keyword=' + encodeURIComponent(keyword);
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.length) {
+        statusEl.textContent = '找不到符合的貼圖';
+        return;
+      }
+
+      statusEl.style.display = 'none';
+      data.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          ${item.image ? `<img src="${item.image}" alt="貼圖">` : ''}
+          <div class="lv">LV ${item.lv}</div>
+          <div class="position">${item.position}</div>
+          <div class="keyword">${item.keyword}</div>
+        `;
+        resultsEl.appendChild(card);
+      });
+    } catch (err) {
+      statusEl.style.display = 'block';
+      statusEl.textContent = '讀取失敗，請確認 Apps Script 網址與部署權限';
+      console.error(err);
+    }
+  }
+</script>
+
+</body>
+</html>

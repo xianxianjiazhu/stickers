@@ -261,11 +261,14 @@
   }
 
   // ---- 搜尋 ----
+  let searchToken = 0; // 每次搜尋都給一個新編號，只有最新那次的結果才會被畫出來
+
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doSearch();
   });
 
   async function doSearch() {
+    const myToken = ++searchToken;
     const keyword = input.value.trim();
     resultsEl.innerHTML = '';
     statusEl.style.display = 'block';
@@ -276,12 +279,16 @@
       const res = await fetch(url);
       const data = await res.json();
 
+      // 如果使用者在等待期間又發起了新的搜尋，這次的結果就不畫了
+      if (myToken !== searchToken) return;
+
       if (!data.length) {
         statusEl.textContent = '找不到符合的貼圖';
         return;
       }
 
       statusEl.style.display = 'none';
+      resultsEl.innerHTML = '';
       data.forEach(item => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -299,6 +306,7 @@
         resultsEl.appendChild(card);
       });
     } catch (err) {
+      if (myToken !== searchToken) return;
       statusEl.style.display = 'block';
       statusEl.textContent = '讀取失敗，請確認 Apps Script 網址與部署權限';
       console.error(err);

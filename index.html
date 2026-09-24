@@ -202,10 +202,10 @@
   <input id="keywordInput" type="text" placeholder="輸入關鍵字，多個關鍵字用空白分隔">
   <button onclick="doSearch()">搜尋</button>
 </div>
-<div class="hint">例如：床上 起來（會找出同時符合任一關鍵字的貼圖）</div>
+<div class="hint">預設顯示全部貼圖；例如：床上 起來（會找出符合任一關鍵字的貼圖）</div>
 
 <div id="results" class="grid"></div>
-<div id="status" class="status">請輸入關鍵字開始搜尋</div>
+<div id="status" class="status">載入中...</div>
 
 <script>
   // 兩份試算表各自的 Apps Script /exec 網址
@@ -229,10 +229,8 @@
     tabsEl.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentKey = btn.dataset.key;
-    resultsEl.innerHTML = '';
-    statusEl.style.display = 'block';
-    statusEl.textContent = '請輸入關鍵字開始搜尋';
     input.value = '';
+    doSearch(); // 切換分頁後直接顯示該分頁全部貼圖
   });
 
   // ---- 主題切換 ----
@@ -272,10 +270,16 @@
     const keyword = input.value.trim();
     resultsEl.innerHTML = '';
     statusEl.style.display = 'block';
-    statusEl.textContent = '搜尋中...';
+    statusEl.textContent = keyword ? '搜尋中...' : '載入中...';
+
+    const baseUrl = SCRIPT_URLS[currentKey];
+    if (!baseUrl.startsWith('http')) {
+      statusEl.textContent = '這個分頁還沒設定 Apps Script 網址';
+      return;
+    }
 
     try {
-      const url = SCRIPT_URLS[currentKey] + '?keyword=' + encodeURIComponent(keyword);
+      const url = baseUrl + '?keyword=' + encodeURIComponent(keyword);
       const res = await fetch(url);
       const data = await res.json();
 
@@ -350,6 +354,9 @@
   function fallbackOpen(url) {
     window.open(url, '_blank');
   }
+
+  // ---- 開啟網頁時預設顯示全部貼圖 ----
+  doSearch();
 </script>
 
 </body>

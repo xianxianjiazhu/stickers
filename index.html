@@ -202,10 +202,10 @@
   <input id="keywordInput" type="text" placeholder="輸入關鍵字，多個關鍵字用空白分隔">
   <button onclick="doSearch()">搜尋</button>
 </div>
-<div class="hint">預設顯示全部貼圖；例如：床上 起來（會找出符合任一關鍵字的貼圖）</div>
+<div class="hint">例如：床上 起來（會找出同時符合任一關鍵字的貼圖）</div>
 
 <div id="results" class="grid"></div>
-<div id="status" class="status">載入中...</div>
+<div id="status" class="status">請輸入關鍵字開始搜尋</div>
 
 <script>
   // 兩份試算表各自的 Apps Script /exec 網址
@@ -229,8 +229,11 @@
     tabsEl.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentKey = btn.dataset.key;
+    resultsEl.innerHTML = '';
+    statusEl.style.display = 'block';
+    statusEl.textContent = '請輸入關鍵字開始搜尋';
     input.value = '';
-    doSearch(); // 切換分頁後直接顯示該分頁全部貼圖
+    loadAll(currentKey); // 切到新分頁時先在背景讀取資料
   });
 
   // ---- 主題切換 ----
@@ -258,6 +261,24 @@
     applyTheme('light');
   }
 
+  // ---- 資料快取 ----
+  // 每個分頁的全部資料只向 Apps Script 要一次，之後搜尋都在網頁裡直接篩選
+  const dataCache = {};
+
+  function loadAll(key) {
+    const baseUrl = SCRIPT_URLS[key];
+    if (!baseUrl.startsWith('http')) return null;
+    if (!dataCache[key]) {
+      dataCache[key] = fetch(baseUrl + '?keyword=')
+        .then(res => res.json())
+        .catch(err => {
+          delete dataCache[key]; // 失敗的話下次搜尋會重新讀取
+          throw err;
+        });
+    }
+    return dataCache[key];
+  }
+
   // ---- 搜尋 ----
   let searchToken = 0; // 每次搜尋都給一個新編號，只有最新那次的結果才會被畫出來
 
@@ -270,21 +291,28 @@
     const keyword = input.value.trim();
     resultsEl.innerHTML = '';
     statusEl.style.display = 'block';
-    statusEl.textContent = keyword ? '搜尋中...' : '載入中...';
 
-    const baseUrl = SCRIPT_URLS[currentKey];
-    if (!baseUrl.startsWith('http')) {
-      statusEl.textContent = '這個分頁還沒設定 Apps Script 網址';
+    if (!keyword) {
+      statusEl.textContent = '請輸入關鍵字開始搜尋';
       return;
     }
 
-    try {
-      const url = baseUrl + '?keyword=' + encodeURIComponent(keyword);
-      const res = await fetch(url);
-      const data = await res.json();
+    const loading = loadAll(currentKey);
+    if (!loading) {
+      statusEl.textContent = '這個分頁還沒設定 Apps Script 網址';
+      return;
+    }
+    statusEl.textContent = '搜尋中...';
 
-      // 如果使用者在等待期間又發起了新的搜尋，這次的結果就不畫了
+    try {
+      const all = await loading;
       if (myToken !== searchToken) return;
+
+      // 多個關鍵字用空白分隔，符合任一個就顯示
+      const terms = keyword.split(/\s+/);
+      const data = all.filter(item =>
+        terms.some(t => String(item.keyword || '').includes(t))
+      );
 
       if (!data.length) {
         statusEl.textContent = '找不到符合的貼圖';
@@ -292,12 +320,11 @@
       }
 
       statusEl.style.display = 'none';
-      resultsEl.innerHTML = '';
       data.forEach(item => {
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-          ${item.image ? `<img src="${item.image}" alt="貼圖">` : ''}
+          ${item.image ? `<img src="${item.image}" alt="貼圖" loading="lazy">` : ''}
           <div class="lv">LV ${item.lv}</div>
           <div class="position">${item.position}</div>
           <div class="keyword">${item.keyword}</div>
@@ -355,8 +382,8 @@
     window.open(url, '_blank');
   }
 
-  // ---- 開啟網頁時預設顯示全部貼圖 ----
-  doSearch();
+  // 開啟網頁時先在背景讀取資料（不顯示），等你打完關鍵字通常已經讀好了
+  loadAll(currentKey);
 </script>
 
 </body>
